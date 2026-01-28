@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AuraHealth</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container topbar__inner">
+        <a class="brand" href="#">
+          <span class="brand__mark" aria-hidden="true">
+            <span class="brand__heart"></span>
+          </span>
+          <span class="brand__text">Aura<span>Health</span></span>
+        </a>
+
+        <nav class="topbar__nav">
+          <button class="linklike" type="button" id="patientLoginBtn">Patient Login</button>
+          <button class="btn btn--dark" type="button" id="doctorJoinBtn">Doctor Join</button>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container hero__inner">
+          <div class="hero__bg"></div>
+          <div class="hero__badge">Aura AI • Symptom Triage</div>
+          <h1 class="hero__title">Healthcare that <span>listens</span> to you.</h1>
+          <p class="hero__subtitle">
+            Describe your symptoms in your own words. Our Aura AI intelligence connects you with the right specialist instantly.
+          </p>
+
+          <form class="hero__search" id="aiForm">
+            <input
+              class="hero__input"
+              type="text"
+              id="symptomInput"
+              placeholder="e.g. Sharp pain in chest and shortness of breath..."
+              autocomplete="off"
+            />
+            <button class="btn btn--primary" type="submit">Consult Aura AI</button>
+          </form>
+
+          <div class="hero__hint" id="aiHint">Try: “skin rash”, “chest pain”, “headache”, “fever”</div>
+          <div class="hero__result" id="aiResult" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="container">
+          <div class="section__head">
+            <div>
+              <h2 class="section__title">Recommended Specialists</h2>
+              <p class="section__sub">Available Doctors near you</p>
+            </div>
+
+            <div class="select">
+              <select id="citySelect" aria-label="Select city">
+                <option value="">Select City</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid" id="doctorsGrid" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <div class="container footer__inner">
+          <div class="footer__left">
+            <span class="footer__mark" aria-hidden="true"></span>
+            <span class="footer__brand">Aura Health</span>
+          </div>
+          <div class="footer__note">
+            Aura AI provides informational suggestions only. This is not a substitute for professional medical advice. Always consult with a qualified physician.
+          </div>
+        </div>
+      </footer>
+    </main>
+
+    <div class="modal" id="authModal" aria-hidden="true">
+      <div class="modal__backdrop" data-close="true"></div>
+      <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <div class="modal__head">
+          <div>
+            <div class="modal__kicker" id="authKicker"></div>
+            <h3 class="modal__title" id="authTitle">Login</h3>
+            <div class="modal__meta" id="authMeta"></div>
+          </div>
+          <button class="iconbtn" type="button" data-close="true" aria-label="Close">×</button>
+        </div>
+
+        <form class="form" id="authForm">
+          <input type="hidden" id="authRole" />
+          <input type="hidden" id="authMode" />
+
+          <div class="form__row" id="authNameRow">
+            <label class="field">
+              <span class="field__label">Full Name</span>
+              <input class="field__input" id="authFullName" type="text" />
+            </label>
+            <label class="field">
+              <span class="field__label">Phone</span>
+              <input class="field__input" id="authPhone" type="tel" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span class="field__label">Email</span>
+            <input class="field__input" id="authEmail" type="email" required />
+          </label>
+
+          <label class="field">
+            <span class="field__label">Password</span>
+            <input class="field__input" id="authPassword" type="password" required />
+          </label>
+
+          <div class="form__row" id="doctorExtraRow">
+            <label class="field">
+              <span class="field__label">Specialty</span>
+              <input class="field__input" id="authSpecialty" type="text" />
+            </label>
+            <label class="field">
+              <span class="field__label">City</span>
+              <input class="field__input" id="authCity" type="text" />
+            </label>
+          </div>
+
+          <div class="form__actions">
+            <button class="btn btn--primary" type="submit" id="authSubmitBtn">Continue</button>
+            <button class="btn btn--ghost" type="button" id="authSwitchBtn">Switch</button>
+          </div>
+
+          <div class="form__msg" id="authMsg" role="status" aria-live="polite"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal" id="bookingModal" aria-hidden="true">
+      <div class="modal__backdrop" data-close="true"></div>
+      <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="bookingTitle">
+        <div class="modal__head">
+          <div>
+            <div class="modal__kicker" id="bookingKicker"></div>
+            <h3 class="modal__title" id="bookingTitle">Book Appointment</h3>
+            <div class="modal__meta" id="bookingMeta"></div>
+          </div>
+          <button class="iconbtn" type="button" data-close="true" aria-label="Close">×</button>
+        </div>
+
+        <form class="form" id="bookingForm">
+          <input type="hidden" id="doctorId" />
+          <input type="hidden" id="bookingMode" />
+
+          <div class="form__row">
+            <label class="field">
+              <span class="field__label">Full Name</span>
+              <input class="field__input" id="patientFullName" type="text" required />
+            </label>
+            <label class="field">
+              <span class="field__label">Phone</span>
+              <input class="field__input" id="patientPhone" type="tel" required />
+            </label>
+          </div>
+
+          <label class="field">
+            <span class="field__label">Email</span>
+            <input class="field__input" id="patientEmail" type="email" required />
+          </label>
+
+          <div class="form__row">
+            <label class="field">
+              <span class="field__label">Date</span>
+              <input class="field__input" id="dateInput" type="date" required />
+            </label>
+            <label class="field">
+              <span class="field__label">Time</span>
+              <input class="field__input" id="timeInput" type="time" required />
+            </label>
+          </div>
+
+          <label class="field">
+            <span class="field__label">Notes (optional)</span>
+            <input class="field__input" id="notesInput" type="text" />
+          </label>
+
+          <div class="form__actions">
+            <button class="btn btn--primary" type="submit" id="confirmBookingBtn">Confirm Booking</button>
+            <button class="btn btn--ghost" type="button" data-close="true">Cancel</button>
+          </div>
+
+          <div class="form__msg" id="bookingMsg" role="status" aria-live="polite"></div>
+        </form>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tele-consult | AuraHealth</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container topbar__inner">
+        <a class="brand" href="/">
+          <span class="brand__mark" aria-hidden="true"><span class="brand__heart"></span></span>
+          <span class="brand__text">Aura<span>Health</span></span>
+        </a>
+
+        <nav class="topbar__nav">
+          <a class="btn btn--ghost" href="/">Back</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="section" style="min-height: calc(100vh - 72px);">
+        <div class="container">
+          <div class="section__head">
+            <div>
+              <h2 class="section__title">Tele-consult</h2>
+              <p class="section__sub" id="roomLabel"></p>
+            </div>
+          </div>
+
+          <div class="grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+            <div class="card">
+              <div class="card__kicker">Your camera</div>
+              <video id="localVideo" autoplay playsinline muted style="width:100%; border-radius: 14px; margin-top: 10px; background:#0f172a;"></video>
+            </div>
+            <div class="card">
+              <div class="card__kicker">Remote</div>
+              <video id="remoteVideo" autoplay playsinline style="width:100%; border-radius: 14px; margin-top: 10px; background:#0f172a;"></video>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px;" class="card">
+            <div class="form__actions" style="grid-template-columns: 1fr 1fr 1fr;">
+              <button class="btn btn--primary" id="joinBtn" type="button">Join Call</button>
+              <button class="btn btn--ghost" id="toggleMicBtn" type="button">Mute Mic</button>
+              <button class="btn btn--dark" id="hangupBtn" type="button">Hang Up</button>
+            </div>
+            <div class="form__msg" id="callMsg" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="teleconsult.js"></script>
+  </body>
+</html>

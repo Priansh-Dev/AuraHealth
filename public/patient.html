@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Patient Dashboard | AuraHealth</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container topbar__inner">
+        <a class="brand" href="/">
+          <span class="brand__mark" aria-hidden="true"><span class="brand__heart"></span></span>
+          <span class="brand__text">Aura<span>Health</span></span>
+        </a>
+
+        <nav class="topbar__nav">
+          <a class="btn btn--ghost" href="/">Home</a>
+          <button class="btn btn--dark" id="logoutBtn" type="button">Logout</button>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="section" style="min-height: calc(100vh - 72px);">
+        <div class="container">
+          <div class="section__head">
+            <div>
+              <h2 class="section__title">Patient Dashboard</h2>
+              <p class="section__sub" id="welcome"></p>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom: 16px;">
+            <div class="card__kicker">Upcoming appointments</div>
+            <div id="apptList" style="margin-top: 10px;"></div>
+          </div>
+
+          <div class="card">
+            <div class="card__kicker">Tip</div>
+            <div class="form__msg" style="margin-top: 8px; color:#64748b;">
+              For tele-consults, use the “Join” link when it’s time.
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="dashboard_patient.js"></script>
+  </body>
+</html>
