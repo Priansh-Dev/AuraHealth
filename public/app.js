@@ -17,6 +17,7 @@ const bookingKicker = document.getElementById('bookingKicker');
 const bookingMeta = document.getElementById('bookingMeta');
 
 const dateInput = document.getElementById('dateInput');
+const timeInput = document.getElementById('timeInput');
 
 const aiForm = document.getElementById('aiForm');
 const aiResult = document.getElementById('aiResult');
@@ -124,11 +125,37 @@ document.addEventListener('keydown', (e) => {
 
 function getTodayISO() {
   const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
 dateInput.min = getTodayISO();
+
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+function getNowTimeHHMM() {
+  const d = new Date();
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function syncTimeMinForSelectedDate() {
+  const today = getTodayISO();
+  const selected = dateInput.value;
+
+  if (selected && selected === today) {
+    timeInput.min = getNowTimeHHMM();
+  } else {
+    timeInput.min = '';
+  }
+
+  if (timeInput.value && timeInput.min && timeInput.value < timeInput.min) {
+    timeInput.value = '';
+  }
+}
+
+dateInput.addEventListener('change', syncTimeMinForSelectedDate);
+timeInput.addEventListener('focus', syncTimeMinForSelectedDate);
 
 async function fetchJSON(url, options) {
   const res = await fetch(url, options);
@@ -405,6 +432,7 @@ doctorsGrid.addEventListener('click', async (e) => {
     document.getElementById('patientPhone').value = user.phone || '';
   }
 
+  syncTimeMinForSelectedDate();
   openModal();
 });
 
@@ -428,6 +456,16 @@ bookingForm.addEventListener('submit', async (e) => {
   }
 
   const scheduledAt = `${date} ${time}:00`;
+
+  const scheduledDate = new Date(`${date}T${time}:00`);
+  if (!Number.isFinite(scheduledDate.getTime())) {
+    bookingMsg.textContent = 'Invalid date/time.';
+    return;
+  }
+  if (scheduledDate.getTime() < Date.now()) {
+    bookingMsg.textContent = 'Please select a future date/time.';
+    return;
+  }
 
   bookingMsg.textContent = 'Booking...';
 

@@ -9,6 +9,16 @@ function makeRoomId() {
   return crypto.randomBytes(16).toString('hex');
 }
 
+function parseScheduledAt(s) {
+  if (!s || typeof s !== 'string') return null;
+  const trimmed = s.trim();
+  if (!trimmed) return null;
+  const isoLike = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T');
+  const d = new Date(isoLike);
+  if (!Number.isFinite(d.getTime())) return null;
+  return d;
+}
+
 appointmentsRouter.post('/', async (req, res) => {
   try {
     const {
@@ -30,6 +40,15 @@ appointmentsRouter.post('/', async (req, res) => {
 
     if (!scheduledAt || typeof scheduledAt !== 'string') {
       return res.status(400).json({ error: 'scheduledAt is required' });
+    }
+
+    const scheduledDate = parseScheduledAt(scheduledAt);
+    if (!scheduledDate) {
+      return res.status(400).json({ error: 'Invalid scheduledAt' });
+    }
+
+    if (scheduledDate.getTime() < Date.now()) {
+      return res.status(400).json({ error: 'scheduledAt must be in the future' });
     }
 
     if (!patientFullName || !patientEmail || !patientPhone) {
