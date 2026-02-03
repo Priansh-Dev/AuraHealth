@@ -69,9 +69,8 @@ function aIFormSafe() {
       .then((body) => {
         const data = body.data;
         const specs = (data.matchedSpecialties || []).filter(Boolean);
-        const label = specs.length ? specs.join(' / ') : 'General Physician';
-
-        aiResult.innerHTML = `Matched specialist: <strong>${label}</strong>. Showing recommended doctors below.`;
+        const specialistLabel = specs.length ? specs.join(' / ') : 'General Physician';
+        aiResult.innerHTML = `Recommended specialist: <strong>${specialistLabel}</strong>. Showing available doctors below.`;
 
         const doctors = data.doctors || [];
         renderDoctors(doctors);
