@@ -183,6 +183,10 @@ function clearSession() {
   updateTopbar();
 }
 
+function getToken() {
+  return localStorage.getItem(LS_TOKEN);
+}
+
 function getUser() {
   try {
     const raw = localStorage.getItem(LS_USER);
@@ -425,11 +429,15 @@ doctorsGrid.addEventListener('click', async (e) => {
   bookingMeta.textContent = `${d.full_name} • ${toTitleCase(d.specialty)} • ${d.city}`;
 
   const user = getUser();
-  if (user && user.role === 'PATIENT') {
-    document.getElementById('patientFullName').value = user.fullName || '';
-    document.getElementById('patientEmail').value = user.email || '';
-    document.getElementById('patientPhone').value = user.phone || '';
+  if (!user || user.role !== 'PATIENT') {
+    openAuthModal();
+    setAuthView('PATIENT', 'LOGIN');
+    return;
   }
+
+  document.getElementById('patientFullName').value = user.fullName || '';
+  document.getElementById('patientEmail').value = user.email || '';
+  document.getElementById('patientPhone').value = user.phone || '';
 
   syncTimeMinForSelectedDate();
   openModal();
@@ -437,6 +445,15 @@ doctorsGrid.addEventListener('click', async (e) => {
 
 bookingForm.addEventListener('submit', async (e) => {
   e.preventDefault();
+
+  const t = getToken();
+  const user = getUser();
+  if (!t || !user || user.role !== 'PATIENT') {
+    closeModal();
+    openAuthModal();
+    setAuthView('PATIENT', 'LOGIN');
+    return;
+  }
 
   const doctorId = Number(doctorIdEl.value);
   const mode = bookingModeEl.value;
@@ -471,20 +488,26 @@ bookingForm.addEventListener('submit', async (e) => {
   try {
     const result = await fetchJSON(`${API_BASE}/api/appointments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
       body: JSON.stringify({
         doctorId,
         mode,
         scheduledAt,
         notes,
         patientFullName,
-        patientEmail,
         patientPhone
       })
     });
 
-    if (mode === 'TELE' && result?.data?.joinUrl) {
-      bookingMsg.innerHTML = `Appointment booked. <a href="${result.data.joinUrl}">Join tele-consult</a>`;
+    if (mode === 'TELE') {
+      const link = result?.data?.joinUrl;
+      bookingMsg.innerHTML = link
+        ? `Tele-consult request sent. <a href="${link}">Open waiting room</a>`
+        : 'Tele-consult request sent. Wait for doctor acceptance in Dashboard.';
+      setTimeout(() => {
+        closeModal();
+        location.href = '/patient.html';
+      }, 900);
       return;
     }
 

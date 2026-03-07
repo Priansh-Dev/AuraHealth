@@ -46,7 +46,12 @@ function render(appts) {
     .map((a) => {
       const dt = new Date(a.scheduled_at);
       const when = isNaN(dt.getTime()) ? a.scheduled_at : dt.toLocaleString();
-      const join = a.mode === 'TELE' && a.room_id ? `<a href="/teleconsult.html?room=${encodeURIComponent(a.room_id)}">Join</a>` : '';
+      const join =
+        a.mode === 'TELE'
+          ? a.room_id
+            ? `<a class="btn btn--ghost" href="/teleconsult.html?appt=${encodeURIComponent(String(a.id))}">Join</a>`
+            : '<span style="color:#64748b; font-weight:700;">Waiting for acceptance</span>'
+          : '';
 
       return `
         <div class="card" style="box-shadow:none; border:1px solid #eef2f7; margin-bottom:10px;">

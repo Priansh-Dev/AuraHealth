@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../db');
+const { requireAuth } = require('../auth_middleware');
 
 const appointmentsRouter = express.Router();
 
@@ -19,15 +20,16 @@ function parseScheduledAt(s) {
   return d;
 }
 
-appointmentsRouter.post('/', async (req, res) => {
+appointmentsRouter.post('/', requireAuth, async (req, res) => {
   try {
+    if (req.user?.role !== 'PATIENT') return res.status(403).json({ error: 'Forbidden' });
+
     const {
       doctorId,
       mode,
       scheduledAt,
       notes,
       patientFullName,
-      patientEmail,
       patientPhone
     } = req.body || {};
 
@@ -51,42 +53,41 @@ appointmentsRouter.post('/', async (req, res) => {
       return res.status(400).json({ error: 'scheduledAt must be in the future' });
     }
 
-    if (!patientFullName || !patientEmail || !patientPhone) {
-      return res.status(400).json({ error: 'Patient details are required' });
-    }
-
     const [doctorRows] = await pool.query('SELECT id FROM doctors WHERE id = ?', [dId]);
     if (!doctorRows[0]) return res.status(404).json({ error: 'Doctor not found' });
 
-    const [patientRows] = await pool.query('SELECT id FROM patients WHERE email = ?', [patientEmail]);
+    const patientId = Number(req.user.patientId);
+    if (!Number.isFinite(patientId)) return res.status(401).json({ error: 'Unauthorized' });
 
-    let patientId;
-    if (patientRows[0]) {
-      patientId = patientRows[0].id;
+    const [patientRows] = await pool.query('SELECT id FROM patients WHERE id = ?', [patientId]);
+    if (!patientRows[0]) return res.status(404).json({ error: 'Patient not found' });
+
+    if (patientFullName || patientPhone) {
       await pool.query(
-        'UPDATE patients SET full_name = ?, phone = ? WHERE id = ?',
-        [patientFullName, patientPhone, patientId]
+        'UPDATE patients SET full_name = COALESCE(?, full_name), phone = COALESCE(?, phone) WHERE id = ?',
+        [patientFullName || null, patientPhone || null, patientId]
       );
-    } else {
-      const [ins] = await pool.query(
-        'INSERT INTO patients (full_name, email, phone) VALUES (?, ?, ?)',
-        [patientFullName, patientEmail, patientPhone]
-      );
-      patientId = ins.insertId;
     }
 
-    const roomId = mode === 'TELE' ? makeRoomId() : null;
+    const roomId = null;
 
     const [apptIns] = await pool.query(
       'INSERT INTO appointments (patient_id, doctor_id, mode, scheduled_at, notes, room_id) VALUES (?, ?, ?, ?, ?, ?)',
       [patientId, dId, mode, scheduledAt, notes || null, roomId]
     );
 
+    const apptId = apptIns.insertId;
+
     res.status(201).json({
       data: {
-        appointmentId: apptIns.insertId,
+        appointmentId: apptId,
         roomId,
-        joinUrl: roomId ? `/teleconsult.html?room=${encodeURIComponent(roomId)}` : null
+        joinUrl:
+          mode === 'TELE'
+            ? `/teleconsult.html?appt=${encodeURIComponent(String(apptId))}`
+            : roomId
+              ? `/teleconsult.html?room=${encodeURIComponent(roomId)}`
+              : null
       }
     });
   } catch (err) {
@@ -94,6 +95,87 @@ appointmentsRouter.post('/', async (req, res) => {
       return res.status(409).json({ error: 'This slot is already booked' });
     }
     res.status(500).json({ error: 'Failed to create appointment' });
+  }
+});
+
+appointmentsRouter.get('/:id', requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+
+    const [rows] = await pool.query(
+      'SELECT id, patient_id, doctor_id, mode, room_id, scheduled_at, status, notes FROM appointments WHERE id = ?',
+      [id]
+    );
+    const a = rows[0];
+    if (!a) return res.status(404).json({ error: 'Appointment not found' });
+
+    if (req.user?.role === 'PATIENT' && Number(req.user.patientId) !== a.patient_id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (req.user?.role === 'DOCTOR' && Number(req.user.doctorId) !== a.doctor_id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    res.json({ data: a });
+  } catch {
+    res.status(500).json({ error: 'Failed to load appointment' });
+  }
+});
+
+appointmentsRouter.post('/:id/accept', requireAuth, async (req, res) => {
+  try {
+    if (req.user?.role !== 'DOCTOR') return res.status(403).json({ error: 'Forbidden' });
+
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+
+    const doctorId = Number(req.user.doctorId);
+    const [rows] = await pool.query(
+      'SELECT id, mode, room_id, status FROM appointments WHERE id = ? AND doctor_id = ?',
+      [id, doctorId]
+    );
+    const a = rows[0];
+    if (!a) return res.status(404).json({ error: 'Appointment not found' });
+    if (a.mode !== 'TELE') return res.status(400).json({ error: 'Not a tele-consult appointment' });
+    if (a.status !== 'BOOKED') return res.status(400).json({ error: 'Appointment not active' });
+
+    if (!a.room_id) {
+      const roomId = makeRoomId();
+      await pool.query('UPDATE appointments SET room_id = ? WHERE id = ? AND room_id IS NULL', [roomId, id]);
+    }
+
+    const [updated] = await pool.query('SELECT room_id FROM appointments WHERE id = ?', [id]);
+    const roomId = updated[0]?.room_id || null;
+
+    res.json({
+      data: {
+        appointmentId: id,
+        roomId,
+        joinUrl: roomId ? `/teleconsult.html?appt=${encodeURIComponent(String(id))}` : null
+      }
+    });
+  } catch {
+    res.status(500).json({ error: 'Failed to accept appointment' });
+  }
+});
+
+appointmentsRouter.post('/:id/complete', requireAuth, async (req, res) => {
+  try {
+    if (req.user?.role !== 'DOCTOR') return res.status(403).json({ error: 'Forbidden' });
+
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+
+    const doctorId = Number(req.user.doctorId);
+    await pool.query(
+      "UPDATE appointments SET status = 'COMPLETED' WHERE id = ? AND doctor_id = ? AND status = 'BOOKED'",
+      [id, doctorId]
+    );
+
+    res.json({ data: { appointmentId: id, status: 'COMPLETED' } });
+  } catch {
+    res.status(500).json({ error: 'Failed to complete appointment' });
   }
 });
 

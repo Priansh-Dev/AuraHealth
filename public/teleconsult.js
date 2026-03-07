@@ -1,5 +1,9 @@
 const qs = new URLSearchParams(location.search);
 const roomId = qs.get('room');
+const apptId = qs.get('appt');
+
+const LS_TOKEN = 'aura_token';
+const LS_USER = 'aura_user';
 
 const roomLabel = document.getElementById('roomLabel');
 const joinBtn = document.getElementById('joinBtn');
@@ -10,7 +14,7 @@ const callMsg = document.getElementById('callMsg');
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 
-roomLabel.textContent = roomId ? `Room: ${roomId}` : 'Missing room id.';
+roomLabel.textContent = roomId ? `Room: ${roomId}` : apptId ? `Appointment: ${apptId}` : 'Missing room id.';
 
 let ws;
 let pc;
@@ -18,12 +22,65 @@ let localStream;
 let micEnabled = true;
 let role = null;
 
+function getToken() {
+  return localStorage.getItem(LS_TOKEN);
+}
+
+function getUser() {
+  try {
+    const raw = localStorage.getItem(LS_USER);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchJSON(url, options) {
+  const res = await fetch(url, options);
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`);
+  return body;
+}
+
+function authHeaders() {
+  const t = getToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+async function loadAppt() {
+  const id = Number(apptId);
+  if (!Number.isFinite(id)) throw new Error('Invalid appointment id.');
+  const body = await fetchJSON(`/api/appointments/${id}`, { headers: { ...authHeaders() } });
+  return body.data;
+}
+
 const rtcConfig = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
 };
 
 function setMsg(m) {
   callMsg.textContent = m;
+}
+
+let pollTimer = null;
+
+async function startCompletionPolling() {
+  if (!apptId) return;
+  if (pollTimer) return;
+
+  pollTimer = setInterval(async () => {
+    try {
+      const a = await loadAppt();
+      if (a.status === 'COMPLETED' || a.status === 'CANCELLED') {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        hangup();
+        setMsg('Consultation completed by doctor.');
+      }
+    } catch {
+      // ignore
+    }
+  }, 2000);
 }
 
 function wsUrl() {
@@ -73,7 +130,40 @@ async function handleAnswer(sdp) {
 }
 
 async function join() {
-  if (!roomId) {
+  const t = getToken();
+  const u = getUser();
+  if (!t || !u) {
+    setMsg('Please login to join the consult.');
+    setTimeout(() => (location.href = '/'), 700);
+    return;
+  }
+
+  let effectiveRoomId = roomId;
+
+  if (!effectiveRoomId && apptId) {
+    joinBtn.disabled = true;
+    setMsg('Waiting for doctor acceptance...');
+
+    while (true) {
+      const a = await loadAppt().catch((e) => {
+        throw e;
+      });
+
+      if (a.status === 'COMPLETED' || a.status === 'CANCELLED') {
+        setMsg('Consultation ended.');
+        return;
+      }
+
+      if (a.room_id) {
+        effectiveRoomId = a.room_id;
+        break;
+      }
+
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+
+  if (!effectiveRoomId) {
     setMsg('Missing room id in URL.');
     return;
   }
@@ -94,7 +184,7 @@ async function join() {
   ws = new WebSocket(wsUrl());
 
   ws.onopen = () => {
-    ws.send(JSON.stringify({ type: 'join', roomId }));
+    ws.send(JSON.stringify({ type: 'join', roomId: effectiveRoomId }));
   };
 
   ws.onmessage = async (ev) => {
@@ -168,6 +258,10 @@ function toggleMic() {
 }
 
 function hangup() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
   try {
     if (ws && ws.readyState === WebSocket.OPEN) ws.close();
   } catch {
@@ -196,6 +290,8 @@ function hangup() {
 }
 
 joinBtn.addEventListener('click', join);
+
+startCompletionPolling();
 
 toggleMicBtn.addEventListener('click', toggleMic);
 

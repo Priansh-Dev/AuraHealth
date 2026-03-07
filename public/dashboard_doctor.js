@@ -27,6 +27,11 @@ async function fetchJSON(url, options) {
   return body;
 }
 
+function authHeaders() {
+  const t = token();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
 function escapeHtml(s) {
   return String(s)
     .replaceAll('&', '&amp;')
@@ -46,7 +51,12 @@ function render(appts) {
     .map((a) => {
       const dt = new Date(a.scheduled_at);
       const when = isNaN(dt.getTime()) ? a.scheduled_at : dt.toLocaleString();
-      const join = a.mode === 'TELE' && a.room_id ? `<a href="/teleconsult.html?room=${encodeURIComponent(a.room_id)}">Join</a>` : '';
+      const isTele = a.mode === 'TELE';
+      const accepted = isTele && a.room_id;
+      const acceptBtn = isTele && !accepted ? `<button class="btn btn--primary" data-action="accept" data-id="${a.id}">Accept</button>` : '';
+      const join = accepted ? `<a class="btn btn--ghost" href="/teleconsult.html?appt=${encodeURIComponent(String(a.id))}">Join</a>` : '';
+      const completeBtn = accepted ? `<button class="btn btn--dark" data-action="complete" data-id="${a.id}">Mark Completed</button>` : '';
+      const right = isTele ? `${acceptBtn}${join}${completeBtn}` : '';
 
       return `
         <div class="card" style="box-shadow:none; border:1px solid #eef2f7; margin-bottom:10px;">
@@ -57,13 +67,47 @@ function render(appts) {
               <div class="card__loc">${escapeHtml(a.patient_email)} • ${escapeHtml(a.patient_phone)}</div>
               <div class="card__loc">${escapeHtml(when)}</div>
             </div>
-            <div style="font-weight:800; color:#0f172a;">${join}</div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">${right}</div>
           </div>
         </div>
       `;
     })
     .join('');
 }
+
+apptList.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+
+  const id = Number(btn.dataset.id);
+  const action = btn.dataset.action;
+  if (!Number.isFinite(id)) return;
+
+  try {
+    if (action === 'accept') {
+      btn.disabled = true;
+      await fetchJSON(`${API_BASE}/api/appointments/${id}/accept`, {
+        method: 'POST',
+        headers: { ...authHeaders() }
+      });
+      await load();
+      return;
+    }
+
+    if (action === 'complete') {
+      btn.disabled = true;
+      await fetchJSON(`${API_BASE}/api/appointments/${id}/complete`, {
+        method: 'POST',
+        headers: { ...authHeaders() }
+      });
+      await load();
+      return;
+    }
+  } catch (err) {
+    btn.disabled = false;
+    alert(err.message);
+  }
+});
 
 async function load() {
   const t = token();

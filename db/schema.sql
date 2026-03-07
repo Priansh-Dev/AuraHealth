@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS appointments (
 
 INSERT INTO doctors (full_name, specialty, city, rating, review_count, avatar_url)
 VALUES
-  ('Dr. Sarah D\'souza', 'Cardiologist', 'Bangalore', 4.9, 120, NULL),
-  ('Dr. Ishaan Verma', 'General Physician', 'Mumbai', 4.6, 120, NULL),
+  ('Dr. Ananya Kulkarni', 'Cardiologist', 'Bangalore', 4.9, 120, NULL),
+  ('Dr. Rohan Mehta', 'General Physician', 'Mumbai', 4.6, 120, NULL),
   ('Dr. Meera Iyer', 'Dermatologist', 'Mumbai', 4.8, 120, NULL),
-  ('Dr. Kevin Peter', 'Pediatrician', 'Delhi', 4.9, 120, NULL);
+  ('Dr. Aarav Sharma', 'Pediatrician', 'Delhi', 4.9, 120, NULL);
