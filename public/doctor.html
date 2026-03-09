@@ -29,18 +29,153 @@
               <h2 class="section__title">Doctor Dashboard</h2>
               <p class="section__sub" id="welcome"></p>
             </div>
-          </div>
 
-          <div class="card" style="margin-bottom: 16px;">
-            <div class="card__kicker">Upcoming appointments</div>
-            <div id="apptList" style="margin-top: 10px;"></div>
-          </div>
-
-          <div class="card">
-            <div class="card__kicker">Note</div>
-            <div class="form__msg" style="margin-top: 8px; color:#64748b;">
-              For tele-consults, open the patient’s room link and click “Join Call”.
+            <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
+              <button class="btn btn--primary" id="menuAppointmentsBtn" type="button">Appointments</button>
+              <button class="btn btn--ghost" id="menuAvailabilityBtn" type="button">Availability settings</button>
             </div>
+          </div>
+
+          <div id="appointmentsSection">
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card__kicker">Appointments</div>
+              <div class="form__msg" style="margin-top: 8px; color:#64748b;">
+                Showing today’s appointments. Use the date picker to view another day.
+              </div>
+
+              <div class="form__row" style="margin-top: 10px;">
+                <label class="field" style="margin:0;">
+                  <span class="field__label">Date</span>
+                  <input class="field__input" id="apptDate" type="date" />
+                </label>
+                <div style="display:flex; align-items:flex-end;">
+                  <button class="btn btn--ghost" id="loadApptsBtn" type="button">Load</button>
+                </div>
+              </div>
+
+              <div id="apptList" style="margin-top: 10px;"></div>
+            </div>
+          </div>
+
+          <div id="availabilitySection" style="display:none;">
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card__kicker">Availability settings (weekly)</div>
+              <div class="form__msg" style="margin-top: 8px; color:#64748b;">
+                Add one or more time ranges per day. Capacity is per 30-minute slot.
+              </div>
+
+            <div id="availMsg" class="form__msg" style="margin-top: 8px;"></div>
+
+            <div class="card" style="box-shadow:none; border:1px solid #eef2f7; margin-top:10px;">
+              <div class="card__kicker">Quick add</div>
+              <div class="form__row" style="margin-top:10px;">
+                <label class="field" style="margin:0;">
+                  <span class="field__label">Mode</span>
+                  <select class="field__input" id="availMode" style="height:44px;">
+                    <option value="IN_CLINIC">IN_CLINIC</option>
+                    <option value="TELE">TELE</option>
+                  </select>
+                </label>
+                <label class="field" style="margin:0;">
+                  <span class="field__label">Capacity / 30 min</span>
+                  <input class="field__input" id="availCap" type="number" min="1" max="50" value="1" />
+                </label>
+              </div>
+
+              <div class="form__row" style="margin-top:10px;">
+                <label class="field" style="margin:0;">
+                  <span class="field__label">Start</span>
+                  <input class="field__input" id="availStart" type="time" value="10:00" />
+                </label>
+                <label class="field" style="margin:0;">
+                  <span class="field__label">End</span>
+                  <input class="field__input" id="availEnd" type="time" value="12:00" />
+                </label>
+              </div>
+
+              <div class="field" style="margin-top:10px;">
+                <span class="field__label">Days</span>
+                <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                  <label style="display:flex; gap:8px; align-items:center; font-weight:700; color:#334155;"><input type="checkbox" class="availDay" value="1" />Mon</label>
+                  <label style="display:flex; gap:8px; align-items:center; font-weight:700; color:#334155;"><input type="checkbox" class="availDay" value="2" />Tue</label>
+                  <label style="display:flex; gap:8px; align-items:center; font-weight:700; color:#334155;"><input type="checkbox" class="availDay" value="3" />Wed</label>
+                  <label style="display:flex; gap:8px; align-items:center; font-weight:700; color:#334155;"><input type="checkbox" class="availDay" value="4" />Thu</label>
+                  <label style="display:flex; gap:8px; align-items:center; font-weight:700; color:#334155;"><input type="checkbox" class="availDay" value="5" />Fri</label>
+                  <label style="display:flex; gap:8px; align-items:center; font-weight:700; color:#334155;"><input type="checkbox" class="availDay" value="6" />Sat</label>
+                  <label style="display:flex; gap:8px; align-items:center; font-weight:700; color:#334155;"><input type="checkbox" class="availDay" value="0" />Sun</label>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top: 12px;">
+                <button class="btn btn--ghost" id="selectWeekdaysBtn" type="button">Select Weekdays</button>
+                <button class="btn btn--ghost" id="clearDaysBtn" type="button">Clear Days</button>
+                <button class="btn btn--primary" id="addAvailSelectedBtn" type="button">Add selected days</button>
+              </div>
+            </div>
+
+            <div id="availRules" style="margin-top: 10px;"></div>
+
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top: 12px;">
+              <button class="btn btn--ghost" id="addAvailRuleBtn" type="button">Add rule</button>
+              <button class="btn btn--primary" id="saveAvailBtn" type="button">Save availability</button>
+            </div>
+          </div>
+
+            <div class="card" style="margin-bottom: 16px;">
+              <div class="card__kicker">Availability exceptions (temporary)</div>
+              <div class="form__msg" style="margin-top: 8px; color:#64748b;">
+                Use this if you need to close a specific date/slot due to an emergency or leave. Only empty slots will be cancelled.
+              </div>
+
+            <div id="unavailMsg" class="form__msg" style="margin-top: 8px;"></div>
+
+            <div class="form__row" style="margin-top:10px;">
+              <label class="field" style="margin:0;">
+                <span class="field__label">Mode</span>
+                <select class="field__input" id="unavailMode" style="height:44px;">
+                  <option value="IN_CLINIC">IN_CLINIC</option>
+                  <option value="TELE">TELE</option>
+                </select>
+              </label>
+              <label class="field" style="margin:0;">
+                <span class="field__label">Block start</span>
+                <input class="field__input" id="unavailStart" type="datetime-local" />
+              </label>
+              <label class="field" style="margin:0;">
+                <span class="field__label">Block end</span>
+                <input class="field__input" id="unavailEnd" type="datetime-local" />
+              </label>
+            </div>
+
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top: 12px;">
+              <button class="btn btn--primary" id="addUnavailBtn" type="button">Add exception</button>
+              <button class="btn btn--ghost" id="refreshUnavailBtn" type="button">Refresh</button>
+            </div>
+
+            <div id="unavailList" style="margin-top: 10px;"></div>
+
+            <div class="card" style="box-shadow:none; border:1px solid #eef2f7; margin-top:12px;">
+              <div class="card__kicker">Cancel specific slots (empty only)</div>
+              <div class="form__row" style="margin-top:10px;">
+                <label class="field" style="margin:0;">
+                  <span class="field__label">Mode</span>
+                  <select class="field__input" id="slotManageMode" style="height:44px;">
+                    <option value="IN_CLINIC">IN_CLINIC</option>
+                    <option value="TELE">TELE</option>
+                  </select>
+                </label>
+                <label class="field" style="margin:0;">
+                  <span class="field__label">Date</span>
+                  <input class="field__input" id="slotManageDate" type="date" />
+                </label>
+                <div style="display:flex; align-items:flex-end;">
+                  <button class="btn btn--ghost" id="loadSlotsBtn" type="button">Load slots</button>
+                </div>
+              </div>
+
+              <div id="slotManageList" style="margin-top: 10px;"></div>
+            </div>
+          </div>
           </div>
         </div>
       </section>

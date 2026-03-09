@@ -15,6 +15,7 @@ const { meRouter } = require('./routes/me');
 const { dashboardRouter } = require('./routes/dashboard');
 const { doctorsRouter } = require('./routes/doctors');
 const { appointmentsRouter } = require('./routes/appointments');
+const { availabilityRouter } = require('./routes/availability');
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use('/api/me', meRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/doctors', doctorsRouter);
 app.use('/api/appointments', appointmentsRouter);
+app.use('/api/availability', availabilityRouter);
 
 pool
   .query('SELECT 1')

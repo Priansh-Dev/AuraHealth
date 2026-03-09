@@ -12,12 +12,21 @@ const bookingMsg = document.getElementById('bookingMsg');
 
 const doctorIdEl = document.getElementById('doctorId');
 const bookingModeEl = document.getElementById('bookingMode');
+const slotIdEl = document.getElementById('slotId');
+const slotPicker = document.getElementById('slotPicker');
+const dateTimeFallbackRow = document.getElementById('dateTimeFallbackRow');
 
 const bookingKicker = document.getElementById('bookingKicker');
 const bookingMeta = document.getElementById('bookingMeta');
 
 const dateInput = document.getElementById('dateInput');
 const timeInput = document.getElementById('timeInput');
+
+let slotState = {
+  slotsByDate: new Map(),
+  orderedDates: [],
+  selectedDate: null
+};
 
 const aiForm = document.getElementById('aiForm');
 const aiResult = document.getElementById('aiResult');
@@ -155,6 +164,158 @@ function syncTimeMinForSelectedDate() {
 
 dateInput.addEventListener('change', syncTimeMinForSelectedDate);
 timeInput.addEventListener('focus', syncTimeMinForSelectedDate);
+
+function fmtDayLabel(d) {
+  const dt = new Date(d);
+  if (!Number.isFinite(dt.getTime())) return String(d);
+  return dt.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+function fmtTimeLabel(d) {
+  const dt = new Date(d);
+  if (!Number.isFinite(dt.getTime())) return String(d);
+  return dt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtDateKey(d) {
+  // Local date key YYYY-MM-DD
+  const dt = d instanceof Date ? d : new Date(d);
+  if (!Number.isFinite(dt.getTime())) return null;
+  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+}
+
+function fmtShortDateLabel(dateKey) {
+  const dt = new Date(`${dateKey}T00:00:00`);
+  if (!Number.isFinite(dt.getTime())) return String(dateKey);
+  const weekday = dt.toLocaleDateString(undefined, { weekday: 'short' });
+  const day = dt.toLocaleDateString(undefined, { day: '2-digit' });
+  const month = dt.toLocaleDateString(undefined, { month: 'short' });
+  return { weekday, day, month };
+}
+
+function clearSlotSelection() {
+  if (slotIdEl) slotIdEl.value = '';
+  slotPicker?.querySelectorAll('.slotbtn.is-selected')?.forEach((b) => b.classList.remove('is-selected'));
+}
+
+function clearDateSelection() {
+  slotPicker?.querySelectorAll('.slotdatebtn.is-selected')?.forEach((b) => b.classList.remove('is-selected'));
+}
+
+function setFallbackVisible(v) {
+  if (!dateTimeFallbackRow) return;
+  dateTimeFallbackRow.style.display = v ? '' : 'none';
+  if (v) {
+    dateInput.required = true;
+    timeInput.required = true;
+  } else {
+    dateInput.required = false;
+    timeInput.required = false;
+  }
+}
+
+function renderSlotCalendar(slots) {
+  if (!slotPicker) return;
+  clearSlotSelection();
+
+  slotState = {
+    slotsByDate: new Map(),
+    orderedDates: [],
+    selectedDate: null
+  };
+
+  if (!Array.isArray(slots) || !slots.length) {
+    slotPicker.innerHTML = '<div class="form__msg" style="color:#64748b; margin-top:0;">No slots available for the next 7 days.</div>';
+    return;
+  }
+
+  for (const s of slots) {
+    const k = fmtDateKey(s.slot_start);
+    if (!k) continue;
+    if (!slotState.slotsByDate.has(k)) slotState.slotsByDate.set(k, []);
+    slotState.slotsByDate.get(k).push(s);
+  }
+
+  slotState.orderedDates = Array.from(slotState.slotsByDate.keys()).sort((a, b) => a.localeCompare(b));
+  slotState.selectedDate = slotState.orderedDates[0] || null;
+
+  const dateTiles = slotState.orderedDates
+    .map((k) => {
+      const meta = fmtShortDateLabel(k);
+      const sel = k === slotState.selectedDate ? ' is-selected' : '';
+      return `
+        <button type="button" class="slotdatebtn${sel}" data-date-key="${k}">
+          <div class="slotdatebtn__wk">${meta.weekday}</div>
+          <div class="slotdatebtn__day">${meta.day}</div>
+          <div class="slotdatebtn__mo">${meta.month}</div>
+        </button>
+      `;
+    })
+    .join('');
+
+  slotPicker.innerHTML = `
+    <div class="slotcal">
+      <div class="slotcal__grid">${dateTiles}</div>
+    </div>
+    <div class="slotsview" id="slotsView"></div>
+  `;
+
+  renderSlotsForSelectedDate();
+}
+
+function renderSlotsForSelectedDate() {
+  if (!slotPicker) return;
+  const view = slotPicker.querySelector('#slotsView');
+  if (!view) return;
+
+  clearSlotSelection();
+
+  const k = slotState.selectedDate;
+  if (!k) {
+    view.innerHTML = '<div class="form__msg" style="color:#64748b; margin-top:0;">Select a date to view slots.</div>';
+    return;
+  }
+
+  const items = (slotState.slotsByDate.get(k) || []).slice().sort((a, b) => String(a.slot_start).localeCompare(String(b.slot_start)));
+  const dayLabel = items.length ? fmtDayLabel(items[0].slot_start) : k;
+
+  const btns = items
+    .map((s) => {
+      const left = Number(s.capacity) - Number(s.booked_count);
+      const leftSafe = Number.isFinite(left) ? Math.max(0, left) : null;
+      const time = fmtTimeLabel(s.slot_start);
+      const suffix = leftSafe != null ? ` • ${leftSafe} left` : '';
+      return `<button type="button" class="slotbtn" data-slot-id="${s.id}">${time}${suffix}</button>`;
+    })
+    .join('');
+
+  view.innerHTML = `
+    <div class="slotday slotday--single">
+      <div class="slotday__title">${dayLabel}</div>
+      <div class="slotday__grid">${btns || '<div class="form__msg" style="color:#64748b; margin-top:0;">No slots on this day.</div>'}</div>
+    </div>
+  `;
+}
+
+async function loadSlotsForBooking() {
+  if (!slotPicker) return;
+  const doctorId = Number(doctorIdEl.value);
+  const mode = bookingModeEl.value;
+  if (!Number.isFinite(doctorId) || (mode !== 'IN_CLINIC' && mode !== 'TELE')) return;
+
+  slotPicker.innerHTML = '<div class="form__msg" style="color:#64748b; margin-top:0;">Loading slots...</div>';
+  setFallbackVisible(false);
+
+  try {
+    const body = await fetchJSON(`${API_BASE}/api/availability/doctor/${doctorId}/slots?mode=${encodeURIComponent(mode)}`);
+    renderSlotCalendar(body.data || []);
+  } catch {
+    // If slots API fails (e.g. migration not run yet), fall back to old date/time booking
+    slotPicker.innerHTML = '<div class="form__msg" style="color:#64748b; margin-top:0;">Slots are unavailable right now. Use date/time to book.</div>';
+    setFallbackVisible(true);
+    syncTimeMinForSelectedDate();
+  }
+}
 
 async function fetchJSON(url, options) {
   const res = await fetch(url, options);
@@ -439,8 +600,30 @@ doctorsGrid.addEventListener('click', async (e) => {
   document.getElementById('patientEmail').value = user.email || '';
   document.getElementById('patientPhone').value = user.phone || '';
 
+  clearSlotSelection();
+  await loadSlotsForBooking();
   syncTimeMinForSelectedDate();
   openModal();
+});
+
+slotPicker?.addEventListener('click', (e) => {
+  const dateBtn = e.target.closest('button[data-date-key]');
+  if (dateBtn) {
+    const k = dateBtn.dataset.dateKey;
+    if (k && k !== slotState.selectedDate) {
+      slotState.selectedDate = k;
+      clearDateSelection();
+      dateBtn.classList.add('is-selected');
+      renderSlotsForSelectedDate();
+    }
+    return;
+  }
+
+  const slotBtn = e.target.closest('button[data-slot-id]');
+  if (!slotBtn) return;
+  clearSlotSelection();
+  slotBtn.classList.add('is-selected');
+  if (slotIdEl) slotIdEl.value = slotBtn.dataset.slotId;
 });
 
 bookingForm.addEventListener('submit', async (e) => {
@@ -466,21 +649,29 @@ bookingForm.addEventListener('submit', async (e) => {
   const time = document.getElementById('timeInput').value;
   const notes = document.getElementById('notesInput').value.trim();
 
-  if (!date || !time) {
-    bookingMsg.textContent = 'Please select date and time.';
+  const selectedSlotId = slotIdEl && slotIdEl.value ? Number(slotIdEl.value) : null;
+  if (selectedSlotId != null && !Number.isFinite(selectedSlotId)) {
+    bookingMsg.textContent = 'Invalid slot selection.';
     return;
   }
 
-  const scheduledAt = `${date} ${time}:00`;
+  let scheduledAt = null;
+  if (!selectedSlotId) {
+    if (!date || !time) {
+      bookingMsg.textContent = 'Please select a slot (or choose date/time).';
+      return;
+    }
 
-  const scheduledDate = new Date(`${date}T${time}:00`);
-  if (!Number.isFinite(scheduledDate.getTime())) {
-    bookingMsg.textContent = 'Invalid date/time.';
-    return;
-  }
-  if (scheduledDate.getTime() < Date.now()) {
-    bookingMsg.textContent = 'Please select a future date/time.';
-    return;
+    scheduledAt = `${date} ${time}:00`;
+    const scheduledDate = new Date(`${date}T${time}:00`);
+    if (!Number.isFinite(scheduledDate.getTime())) {
+      bookingMsg.textContent = 'Invalid date/time.';
+      return;
+    }
+    if (scheduledDate.getTime() < Date.now()) {
+      bookingMsg.textContent = 'Please select a future date/time.';
+      return;
+    }
   }
 
   bookingMsg.textContent = 'Booking...';
@@ -493,6 +684,7 @@ bookingForm.addEventListener('submit', async (e) => {
         doctorId,
         mode,
         scheduledAt,
+        slotId: selectedSlotId,
         notes,
         patientFullName,
         patientPhone

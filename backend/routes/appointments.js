@@ -28,6 +28,7 @@ appointmentsRouter.post('/', requireAuth, async (req, res) => {
       doctorId,
       mode,
       scheduledAt,
+      slotId,
       notes,
       patientFullName,
       patientPhone
@@ -40,17 +41,27 @@ appointmentsRouter.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid mode' });
     }
 
-    if (!scheduledAt || typeof scheduledAt !== 'string') {
-      return res.status(400).json({ error: 'scheduledAt is required' });
+    const sId = slotId == null ? null : Number(slotId);
+    if (slotId != null && !Number.isFinite(sId)) {
+      return res.status(400).json({ error: 'Invalid slotId' });
     }
 
-    const scheduledDate = parseScheduledAt(scheduledAt);
-    if (!scheduledDate) {
-      return res.status(400).json({ error: 'Invalid scheduledAt' });
-    }
+    // Backward-compatible path: allow scheduledAt booking when slotId is not provided.
+    let scheduledAtEffective = null;
+    if (!sId) {
+      if (!scheduledAt || typeof scheduledAt !== 'string') {
+        return res.status(400).json({ error: 'scheduledAt is required' });
+      }
 
-    if (scheduledDate.getTime() < Date.now()) {
-      return res.status(400).json({ error: 'scheduledAt must be in the future' });
+      const scheduledDate = parseScheduledAt(scheduledAt);
+      if (!scheduledDate) {
+        return res.status(400).json({ error: 'Invalid scheduledAt' });
+      }
+
+      if (scheduledDate.getTime() < Date.now()) {
+        return res.status(400).json({ error: 'scheduledAt must be in the future' });
+      }
+      scheduledAtEffective = scheduledAt;
     }
 
     const [doctorRows] = await pool.query('SELECT id FROM doctors WHERE id = ?', [dId]);
@@ -71,16 +82,99 @@ appointmentsRouter.post('/', requireAuth, async (req, res) => {
 
     const roomId = null;
 
-    const [apptIns] = await pool.query(
-      'INSERT INTO appointments (patient_id, doctor_id, mode, scheduled_at, notes, room_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [patientId, dId, mode, scheduledAt, notes || null, roomId]
-    );
+    let apptIns;
+    let usedSlotId = null;
+
+    if (sId) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+
+        const [slotRows] = await conn.query(
+          `SELECT id, doctor_id, mode, slot_start, slot_end, capacity, booked_count, status
+           FROM doctor_slots
+           WHERE id = ?
+           FOR UPDATE`,
+          [sId]
+        );
+
+        const slot = slotRows[0];
+        if (!slot) {
+          await conn.rollback();
+          conn.release();
+          return res.status(404).json({ error: 'Slot not found' });
+        }
+
+        if (Number(slot.doctor_id) !== dId) {
+          await conn.rollback();
+          conn.release();
+          return res.status(400).json({ error: 'Slot does not belong to this doctor' });
+        }
+
+        if (String(slot.mode) !== mode) {
+          await conn.rollback();
+          conn.release();
+          return res.status(400).json({ error: 'Slot mode mismatch' });
+        }
+
+        if (String(slot.status || 'ACTIVE') !== 'ACTIVE') {
+          await conn.rollback();
+          conn.release();
+          return res.status(409).json({ error: 'Slot is unavailable' });
+        }
+
+        const slotStart = new Date(slot.slot_start);
+        if (!Number.isFinite(slotStart.getTime()) || slotStart.getTime() < Date.now()) {
+          await conn.rollback();
+          conn.release();
+          return res.status(400).json({ error: 'Slot is in the past' });
+        }
+
+        const capacity = Number(slot.capacity);
+        const booked = Number(slot.booked_count);
+        if (!Number.isFinite(capacity) || !Number.isFinite(booked) || booked >= capacity) {
+          await conn.rollback();
+          conn.release();
+          return res.status(409).json({ error: 'Slot is fully booked' });
+        }
+
+        await conn.query('UPDATE doctor_slots SET booked_count = booked_count + 1 WHERE id = ?', [sId]);
+
+        const scheduledSql = slot.slot_start;
+        [apptIns] = await conn.query(
+          'INSERT INTO appointments (patient_id, doctor_id, mode, scheduled_at, notes, room_id, slot_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [patientId, dId, mode, scheduledSql, notes || null, roomId, sId]
+        );
+
+        await conn.commit();
+        usedSlotId = sId;
+      } catch (e) {
+        try {
+          await conn.rollback();
+        } catch {
+          // ignore
+        }
+        throw e;
+      } finally {
+        try {
+          conn.release();
+        } catch {
+          // ignore
+        }
+      }
+    } else {
+      [apptIns] = await pool.query(
+        'INSERT INTO appointments (patient_id, doctor_id, mode, scheduled_at, notes, room_id) VALUES (?, ?, ?, ?, ?, ?)',
+        [patientId, dId, mode, scheduledAtEffective, notes || null, roomId]
+      );
+    }
 
     const apptId = apptIns.insertId;
 
     res.status(201).json({
       data: {
         appointmentId: apptId,
+        slotId: usedSlotId,
         roomId,
         joinUrl:
           mode === 'TELE'
