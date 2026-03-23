@@ -956,3 +956,6 @@ h1, h2, h3, h4, h5, h6 {
 [style*="border:1px solid #eef2f7"] {
   border: 1px solid var(--border) !important;
 }
+#aura-ai-btn{
+  border-radius:25px;
+}
