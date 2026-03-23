@@ -1,5 +1,9 @@
 const mysql = require('mysql2/promise');
 
+const sslConfig = process.env.MYSQL_HOST && process.env.MYSQL_HOST.includes('aivencloud') 
+  ? { rejectUnauthorized: false } 
+  : undefined;
+
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST,
   port: Number(process.env.MYSQL_PORT || 3306),
@@ -9,9 +13,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  ssl: process.env.MYSQL_HOST && process.env.MYSQL_HOST.includes('aivencloud') 
-    ? { rejectUnauthorized: true } 
-    : undefined
+  ssl: sslConfig
 });
 
 module.exports = { pool };
