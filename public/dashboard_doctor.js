@@ -169,10 +169,11 @@ async function loadSlotsForDate() {
 
     slotManageList.innerHTML = arr
       .map((s) => {
-        const dt = new Date(s.slot_start);
-        const time = Number.isFinite(dt.getTime())
-          ? dt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-          : String(s.slot_start);
+        const ds = new Date(s.slot_start);
+        const de = new Date(s.slot_end);
+        const t1 = Number.isFinite(ds.getTime()) ? ds.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : String(s.slot_start);
+        const t2 = Number.isFinite(de.getTime()) ? de.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : String(s.slot_end);
+        const time = `${t1} - ${t2}`;
         const cap = Number(s.capacity);
         const booked = Number(s.booked_count);
         const status = String(s.status || 'ACTIVE');

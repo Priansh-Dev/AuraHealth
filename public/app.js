@@ -283,9 +283,11 @@ function renderSlotsForSelectedDate() {
     .map((s) => {
       const left = Number(s.capacity) - Number(s.booked_count);
       const leftSafe = Number.isFinite(left) ? Math.max(0, left) : null;
-      const time = fmtTimeLabel(s.slot_start);
+      const t1 = fmtTimeLabel(s.slot_start);
+      const t2 = fmtTimeLabel(s.slot_end);
+      const timeStr = `${t1}-${t2}`;
       const suffix = leftSafe != null ? ` • ${leftSafe} left` : '';
-      return `<button type="button" class="slotbtn" data-slot-id="${s.id}">${time}${suffix}</button>`;
+      return `<button type="button" class="slotbtn" data-slot-id="${s.id}">${timeStr}${suffix}</button>`;
     })
     .join('');
 

@@ -123,8 +123,8 @@ appointmentsRouter.post('/', requireAuth, async (req, res) => {
           return res.status(409).json({ error: 'Slot is unavailable' });
         }
 
-        const slotStart = new Date(slot.slot_start);
-        if (!Number.isFinite(slotStart.getTime()) || slotStart.getTime() < Date.now()) {
+        const slotEnd = new Date(slot.slot_end);
+        if (!Number.isFinite(slotEnd.getTime()) || slotEnd.getTime() < Date.now()) {
           await conn.rollback();
           conn.release();
           return res.status(400).json({ error: 'Slot is in the past' });

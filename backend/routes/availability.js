@@ -380,7 +380,7 @@ availabilityRouter.get('/doctor/:id/slots', async (req, res) => {
       `SELECT id, slot_start, slot_end, capacity, booked_count
        FROM doctor_slots
        WHERE doctor_id = ? AND mode = ?
-         AND slot_start >= NOW()
+         AND slot_end > NOW()
          AND slot_start < DATE_ADD(NOW(), INTERVAL 7 DAY)
          AND status = 'ACTIVE'
          AND booked_count < capacity
