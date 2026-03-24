@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../db');
 const { requireAuth } = require('../auth_middleware');
+const { notifyUser } = require('../ws');
 
 const appointmentsRouter = express.Router();
 
@@ -171,6 +172,8 @@ appointmentsRouter.post('/', requireAuth, async (req, res) => {
 
     const apptId = apptIns.insertId;
 
+    notifyUser(`doctor_${dId}`, { type: 'appointment-update', action: 'new' });
+
     res.status(201).json({
       data: {
         appointmentId: apptId,
@@ -239,8 +242,13 @@ appointmentsRouter.post('/:id/accept', requireAuth, async (req, res) => {
       await pool.query('UPDATE appointments SET room_id = ? WHERE id = ? AND room_id IS NULL', [roomId, id]);
     }
 
-    const [updated] = await pool.query('SELECT room_id FROM appointments WHERE id = ?', [id]);
+    const [updated] = await pool.query('SELECT room_id, patient_id FROM appointments WHERE id = ?', [id]);
     const roomId = updated[0]?.room_id || null;
+    const patientIdFromAppt = updated[0]?.patient_id;
+
+    if (patientIdFromAppt) {
+      notifyUser(`patient_${patientIdFromAppt}`, { type: 'appointment-update', action: 'accepted', appointmentId: id });
+    }
 
     res.json({
       data: {

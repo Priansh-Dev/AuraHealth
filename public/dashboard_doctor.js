@@ -41,6 +41,8 @@ const slotManageDate = document.getElementById('slotManageDate');
 const loadSlotsBtn = document.getElementById('loadSlotsBtn');
 const slotManageList = document.getElementById('slotManageList');
 
+let ws = null;
+
 function token() {
   return localStorage.getItem(LS_TOKEN);
 }
@@ -210,6 +212,35 @@ function getUser() {
   } catch {
     return null;
   }
+}
+
+function connectWebSocket() {
+  const u = getUser();
+  if (!u || u.role !== 'DOCTOR') return;
+
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${location.host}/ws`;
+
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'register', userId: `doctor_${u.id}` }));
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'appointment-update') {
+        loadAppointmentsForDate(apptDate?.value || '').catch(() => {});
+      }
+    } catch {}
+  };
+
+  ws.onerror = () => {};
+  
+  ws.onclose = () => {
+    setTimeout(() => connectWebSocket(), 5000);
+  };
 }
 
 async function fetchJSON(url, options) {
@@ -418,8 +449,8 @@ function render(appts) {
       const accepted = isTele && a.room_id;
       const acceptBtn = isTele && !accepted ? `<button class="btn btn--primary" data-action="accept" data-id="${a.id}">Accept</button>` : '';
       const join = accepted ? `<a class="btn btn--ghost" href="/teleconsult.html?appt=${encodeURIComponent(String(a.id))}">Join</a>` : '';
-      const completeBtn = accepted ? `<button class="btn btn--dark" data-action="complete" data-id="${a.id}">Mark Completed</button>` : '';
-      const right = isTele ? `${acceptBtn}${join}${completeBtn}` : '';
+      const completeBtn = `<button class="btn btn--dark" data-action="complete" data-id="${a.id}">Mark Completed</button>`;
+      const right = isTele ? `${acceptBtn}${join}${completeBtn}` : completeBtn;
 
       return `
         <div class="card" style="box-shadow:none; border:1px solid #eef2f7; margin-bottom:10px;">
@@ -502,6 +533,7 @@ async function load() {
 }
 
 logoutBtn.addEventListener('click', () => {
+  if (ws) ws.close();
   localStorage.removeItem(LS_TOKEN);
   localStorage.removeItem(LS_USER);
   location.href = '/';
@@ -510,6 +542,8 @@ logoutBtn.addEventListener('click', () => {
 load().catch((err) => {
   apptList.textContent = err.message;
 });
+
+connectWebSocket();
 
 menuAppointmentsBtn?.addEventListener('click', () => {
   setActiveMenu('appointments');

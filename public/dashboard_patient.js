@@ -7,6 +7,8 @@ const welcome = document.getElementById('welcome');
 const apptList = document.getElementById('apptList');
 const logoutBtn = document.getElementById('logoutBtn');
 
+let ws = null;
+
 function token() {
   return localStorage.getItem(LS_TOKEN);
 }
@@ -18,6 +20,35 @@ function getUser() {
   } catch {
     return null;
   }
+}
+
+function connectWebSocket() {
+  const u = getUser();
+  if (!u || u.role !== 'PATIENT') return;
+
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${location.host}/ws`;
+
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'register', userId: `patient_${u.id}` }));
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'appointment-update') {
+        load().catch(() => {});
+      }
+    } catch {}
+  };
+
+  ws.onerror = () => {};
+  
+  ws.onclose = () => {
+    setTimeout(() => connectWebSocket(), 5000);
+  };
 }
 
 async function fetchJSON(url, options) {
@@ -93,6 +124,7 @@ async function load() {
 }
 
 logoutBtn.addEventListener('click', () => {
+  if (ws) ws.close();
   localStorage.removeItem(LS_TOKEN);
   localStorage.removeItem(LS_USER);
   location.href = '/';
@@ -101,3 +133,5 @@ logoutBtn.addEventListener('click', () => {
 load().catch((err) => {
   apptList.textContent = err.message;
 });
+
+connectWebSocket();

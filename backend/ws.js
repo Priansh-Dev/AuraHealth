@@ -1,9 +1,13 @@
 const WebSocket = require('ws');
 
+let wssInstance = null;
+const userConnections = new Map(); 
+
 function attachWebRtcSignaling(httpServer) {
   const wss = new WebSocket.Server({ server: httpServer, path: '/ws' });
+  wssInstance = wss;
 
-  const rooms = new Map(); // roomId -> Set<ws>
+  const rooms = new Map(); 
 
   function getRoom(roomId) {
     if (!rooms.has(roomId)) rooms.set(roomId, new Set());
@@ -22,12 +26,24 @@ function attachWebRtcSignaling(httpServer) {
 
   wss.on('connection', (ws) => {
     ws.roomId = null;
+    ws.userId = null;
 
     ws.on('message', (data) => {
       let msg;
       try {
         msg = JSON.parse(String(data));
       } catch {
+        return;
+      }
+
+      if (msg.type === 'register') {
+        const userId = String(msg.userId || '').trim();
+        if (!userId) return;
+
+        ws.userId = userId;
+        if (!userConnections.has(userId)) userConnections.set(userId, new Set());
+        userConnections.get(userId).add(ws);
+        ws.send(JSON.stringify({ type: 'registered', userId }));
         return;
       }
 
@@ -54,6 +70,14 @@ function attachWebRtcSignaling(httpServer) {
     });
 
     ws.on('close', () => {
+      if (ws.userId) {
+        const conns = userConnections.get(ws.userId);
+        if (conns) {
+          conns.delete(ws);
+          if (conns.size === 0) userConnections.delete(ws.userId);
+        }
+      }
+
       const roomId = ws.roomId;
       if (!roomId) return;
 
@@ -75,4 +99,14 @@ function attachWebRtcSignaling(httpServer) {
   return wss;
 }
 
-module.exports = { attachWebRtcSignaling };
+function notifyUser(userId, message) {
+  const conns = userConnections.get(String(userId));
+  if (!conns) return;
+  for (const ws of conns) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message));
+    }
+  }
+}
+
+module.exports = { attachWebRtcSignaling, notifyUser };
