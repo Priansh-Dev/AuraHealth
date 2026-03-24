@@ -376,16 +376,20 @@ availabilityRouter.get('/doctor/:id/slots', async (req, res) => {
 
     await ensureSlotsForDoctor({ doctorId, mode, daysAhead: 7 });
 
+    const nowDt = new Date();
+    const nowStr = fmtSqlDateTime(nowDt);
+    const endStr = fmtSqlDateTime(new Date(nowDt.getTime() + 7 * 24 * 3600 * 1000));
+
     const [rows] = await pool.query(
       `SELECT id, slot_start, slot_end, capacity, booked_count
        FROM doctor_slots
        WHERE doctor_id = ? AND mode = ?
-         AND slot_end > NOW()
-         AND slot_start < DATE_ADD(NOW(), INTERVAL 7 DAY)
+         AND slot_end > ?
+         AND slot_start < ?
          AND status = 'ACTIVE'
          AND booked_count < capacity
        ORDER BY slot_start ASC`,
-      [doctorId, mode]
+      [doctorId, mode, nowStr, endStr]
     );
 
     res.json({ data: rows });

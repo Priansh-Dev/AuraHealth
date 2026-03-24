@@ -412,7 +412,8 @@ function render(appts) {
   apptList.innerHTML = appts
     .map((a) => {
       const dt = new Date(a.scheduled_at);
-      const when = isNaN(dt.getTime()) ? a.scheduled_at : dt.toLocaleString();
+      const dte = new Date(a.scheduled_end || dt.getTime() + 30 * 60000);
+      const when = isNaN(dt.getTime()) ? a.scheduled_at : `${dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} • ${dt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} - ${dte.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
       const isTele = a.mode === 'TELE';
       const accepted = isTele && a.room_id;
       const acceptBtn = isTele && !accepted ? `<button class="btn btn--primary" data-action="accept" data-id="${a.id}">Accept</button>` : '';
