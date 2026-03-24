@@ -48,3 +48,6 @@ build/
 # Temporary folders
 tmp/
 temp/
+
+# Database certificates
+ca.pem
